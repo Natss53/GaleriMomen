@@ -332,7 +332,8 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
                             </div>
                         </div>
                         <div class="col-md-3 d-flex gap-1">
-                            <button class="btn btn-dark w-100 rounded-3" type="submit">Filter</button>
+                            <!-- Tombol Filter dinamis: btn-dark saat light mode, btn-light saat dark mode -->
+                            <button id="filterBtn" class="btn btn-dark w-100 rounded-3" type="submit">Filter</button>
                             <?php if ($search !== '' || $filter_date !== ''): ?>
                                 <a href="index.php" class="btn btn-outline-secondary rounded-3" title="Reset Filter"><i class="bi bi-arrow-counterclockwise"></i></a>
                             <?php endif; ?>
@@ -469,9 +470,10 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
     <div class="modal fade" id="imageLightboxModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content bg-transparent border-0">
-                <div class="modal-body text-center position-relative p-0">
-                    <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3 bg-dark p-2 rounded-circle shadow" data-bs-dismiss="modal" aria-label="Close"></button>
-                    <img id="lightboxImage" src="" class="img-fluid rounded-4 shadow-lg" alt="Zoomed Image" style="max-height: 85vh; object-fit: contain;">
+                <div class="position-relative w-100 text-center">
+                    <!-- Tombol close diposisikan di luar sudut kanan atas gambar dengan background putih solid dan kontras -->
+                    <button type="button" class="btn-close position-absolute top-0 end-0 translate-middle-y bg-white p-2 rounded-circle shadow-lg z-3" data-bs-dismiss="modal" aria-label="Close" style="right: -10px !important; opacity: 1;"></button>
+                    <img id="lightboxImage" src="" class="img-fluid rounded-4 shadow-lg bg-body" alt="Zoomed Image" style="max-height: 85vh; object-fit: contain;">
                 </div>
             </div>
         </div>
@@ -483,6 +485,7 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
         const toggleIcon = document.getElementById('toggleIcon');
         const toggleText = document.getElementById('toggleText');
         const adminLoginBtn = document.getElementById('adminLoginBtn');
+        const filterBtn = document.getElementById('filterBtn');
         const htmlElement = document.documentElement;
 
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -504,12 +507,18 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
                 if (adminLoginBtn) {
                     adminLoginBtn.className = 'btn btn-outline-light btn-sm rounded-pill px-3';
                 }
+                if (filterBtn) {
+                    filterBtn.className = 'btn btn-light w-100 rounded-3 text-dark';
+                }
             } else {
                 toggleIcon.className = 'bi bi-moon-fill';
                 toggleText.textContent = 'Dark';
                 toggleBtn.className = 'btn btn-outline-secondary btn-sm rounded-pill px-3';
                 if (adminLoginBtn) {
                     adminLoginBtn.className = 'btn btn-outline-secondary btn-sm rounded-pill px-3';
+                }
+                if (filterBtn) {
+                    filterBtn.className = 'btn btn-dark w-100 rounded-3';
                 }
             }
         }
