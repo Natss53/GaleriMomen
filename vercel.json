@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "receives": [
-    { "source": "/(.*)", "destination": "/index.php" }
-  ],
   "builds": [
     { "src": "index.php", "use": "@vercel/php" }
   ],
