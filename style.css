@@ -1,0 +1,51 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.navbar {
+    backdrop-filter: blur(10px);
+}
+
+.upload-card, .search-card, .photo-card, .admin-stats-card {
+    border: none;
+    border-radius: 16px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.photo-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.photo-card img {
+    height: 250px;
+    object-fit: cover;
+    width: 100%;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+.caption-text {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.author-text {
+    font-size: 0.85rem;
+}
+
+/* Kotak Komentar */
+.comments-section {
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 10px;
+    padding: 8px;
+}
+
+.form-control, .form-control:focus {
+    border-radius: 10px;
+}
