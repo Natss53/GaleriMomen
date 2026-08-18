@@ -1,6 +1,7 @@
 <?php
 session_start();
 
+date_default_timezone_set('Asia/Jakarta');
 $upload_dir = 'uploads/';
 $admin_key = 'NikoAdmin2026'; // Ganti dengan key admin kamu
 
@@ -17,7 +18,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS photos (
     filename TEXT NOT NULL,
     username TEXT NOT NULL,
     caption TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME
 )");
 
 // Buat Tabel Comments
@@ -26,7 +27,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS comments (
     photo_id INTEGER NOT NULL,
     commenter TEXT NOT NULL,
     comment_text TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME,
     FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
 )");
 
@@ -64,15 +65,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
             $username = htmlspecialchars($_POST['username']);
             $caption = htmlspecialchars($_POST['caption']);
-            
+
+            // Waktu lokal WIB (UTC + 7 jam / 25200 detik)
+            $created_at = gmdate('Y-m-d H:i:s', time() + 25200);
+
             $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
             $new_filename = date('YmdHis') . '_' . uniqid() . '.' . $file_ext;
             $target_file = $upload_dir . $new_filename;
 
             if (move_uploaded_file($_FILES['photo']['tmp_name'], $target_file)) {
-                $stmt = $db->prepare("INSERT INTO photos (filename, username, caption) VALUES (?, ?, ?)");
-                $stmt->execute([$new_filename, $username, $caption]);
-                
+                $stmt = $db->prepare("INSERT INTO photos (filename, username, caption, created_at) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$new_filename, $username, $caption, $created_at]);
+
                 $_SESSION['message'] = 'Foto berhasil di-post!';
                 $_SESSION['msg_type'] = 'success';
             } else {
@@ -93,11 +97,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($photo) {
             $file_path = $upload_dir . $photo['filename'];
-            if (file_exists($file_path)) { unlink($file_path); }
-            
+            if (file_exists($file_path)) {
+                unlink($file_path);
+            }
+
             $db->prepare("DELETE FROM photos WHERE id = ?")->execute([$id]);
             $db->prepare("DELETE FROM comments WHERE photo_id = ?")->execute([$id]);
-            
+
             $_SESSION['message'] = 'Foto berhasil dihapus.';
             $_SESSION['msg_type'] = 'success';
         }
@@ -113,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $db->prepare("UPDATE photos SET username = ?, caption = ? WHERE id = ?");
         $stmt->execute([$new_username, $new_caption, $id]);
-        
+
         $_SESSION['message'] = 'Informasi foto berhasil diperbarui.';
         $_SESSION['msg_type'] = 'success';
         header("Location: " . strtok($_SERVER['REQUEST_URI'], '?'));
@@ -125,10 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photo_id = $_POST['photo_id'];
         $commenter = htmlspecialchars($_POST['commenter']);
         $comment_text = htmlspecialchars($_POST['comment_text']);
+        $created_at = gmdate('Y-m-d H:i:s', time() + 25200);
 
         if (!empty($commenter) && !empty($comment_text)) {
-            $stmt = $db->prepare("INSERT INTO comments (photo_id, commenter, comment_text) VALUES (?, ?, ?)");
-            $stmt->execute([$photo_id, $commenter, $comment_text]);
+            $stmt = $db->prepare("INSERT INTO comments (photo_id, commenter, comment_text, created_at) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$photo_id, $commenter, $comment_text, $created_at]);
             $_SESSION['message'] = 'Komentar ditambahkan.';
             $_SESSION['msg_type'] = 'success';
         }
@@ -172,7 +179,9 @@ $total_comments = $total_comments_stmt->fetchColumn();
 
 $folder_size = 0;
 foreach (glob($upload_dir . "*") as $file) {
-    if (is_file($file)) { $folder_size += filesize($file); }
+    if (is_file($file)) {
+        $folder_size += filesize($file);
+    }
 }
 $folder_size_mb = round($folder_size / 1024 / 1024, 2);
 
@@ -183,32 +192,35 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
 
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Galeri Momen</title>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg border-bottom mb-4 shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="index.php"><i class="bi bi-camera-fill me-2 text-primary"></i>Galeri Momen</a>
-            
+            <a class="navbar-brand fw-bold" href="index.php"><i class="bi bi-camera-fill me-2 text-primary"></i>Galeri
+                Momen</a>
+
             <div class="d-flex align-items-center gap-2">
                 <?php if (isset($_SESSION['is_admin'])): ?>
                     <form action="" method="post" class="m-0">
                         <input type="hidden" name="action" value="admin_logout">
-                        <button type="submit" class="btn btn-danger btn-sm rounded-pill px-3"><i class="bi bi-shield-lock-fill me-1"></i> Logout Admin</button>
+                        <button type="submit" class="btn btn-danger btn-sm rounded-pill px-3"><i
+                                class="bi bi-shield-lock-fill me-1"></i> Logout Admin</button>
                     </form>
                 <?php else: ?>
-                    <!-- Menggunakan btn-outline-secondary agar tetap terlihat jelas di Light maupun Dark Mode -->
-                    <button id="adminLoginBtn" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#adminModal">
+                    <button id="adminLoginBtn" class="btn btn-outline-secondary btn-sm rounded-pill px-3"
+                        data-bs-toggle="modal" data-bs-target="#adminModal">
                         <i class="bi bi-shield-lock me-1"></i> Admin Login
                     </button>
                 <?php endif; ?>
@@ -221,7 +233,7 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
     </nav>
 
     <div class="container pb-5">
-        
+
         <?php if ($message): ?>
             <div class="alert alert-<?= $msg_type ?> alert-dismissible fade show shadow-sm rounded-4 border-0" role="alert">
                 <?= $message ?>
@@ -229,7 +241,6 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
             </div>
         <?php endif; ?>
 
-        <!-- DASHBOARD STATISTIK ADMIN -->
         <?php if (isset($_SESSION['is_admin'])): ?>
             <div class="row justify-content-center mb-4">
                 <div class="col-md-10 col-lg-8">
@@ -260,57 +271,61 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
             </div>
         <?php endif; ?>
 
-        <!-- STATISTIK PUBLIK UNTUK USER & SEMUA PENGUNJUNG -->
         <div class="row justify-content-center mb-4">
             <div class="col-md-10 col-lg-8">
                 <div class="card p-3 shadow-sm border-0 rounded-4 bg-body-tertiary">
                     <div class="row text-center g-2 align-items-center">
                         <div class="col-6 border-end">
                             <h4 class="fw-bold mb-0 text-primary"><?= $total_photos_public ?></h4>
-                            <small class="text-muted" style="font-size: 0.8rem;"><i class="bi bi-images me-1"></i>Total Foto Diposting</small>
+                            <small class="text-muted" style="font-size: 0.8rem;"><i class="bi bi-images me-1"></i>Total
+                                Foto Diposting</small>
                         </div>
                         <div class="col-6">
                             <h4 class="fw-bold mb-0 text-success"><?= $total_unique_users ?></h4>
-                            <small class="text-muted" style="font-size: 0.8rem;"><i class="bi bi-people me-1"></i>Total Kontributor Unik</small>
+                            <small class="text-muted" style="font-size: 0.8rem;"><i class="bi bi-people me-1"></i>Total
+                                Kontributor Unik</small>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Form Upload -->
         <div class="row justify-content-center mb-4">
             <div class="col-md-8 col-lg-6">
                 <div class="card upload-card p-4">
-                    <h5 class="mb-4 text-center fw-bold"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Post Foto Baru</h5>
+                    <h5 class="mb-4 text-center fw-bold"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Post
+                        Foto Baru</h5>
                     <form action="" method="post" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="upload">
-                        
+
                         <div class="mb-3">
                             <label class="form-label text-muted small fw-semibold">Pilih Foto (Kamera / Galeri)</label>
-                            <input class="form-control form-control-lg py-2" type="file" name="photo" accept="image/*" required>
+                            <input class="form-control form-control-lg py-2" type="file" name="photo" accept="image/*"
+                                required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label text-muted small fw-semibold">Nama Anda</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                <input type="text" class="form-control" name="username" placeholder="Contoh: Niko" required>
+                                <input type="text" class="form-control" name="username" placeholder="Contoh: Niko"
+                                    required>
                             </div>
                         </div>
-                        
+
                         <div class="mb-4">
                             <label class="form-label text-muted small fw-semibold">Keterangan</label>
-                            <textarea class="form-control" name="caption" rows="2" placeholder="Ceritakan momen ini..." required></textarea>
+                            <textarea class="form-control" name="caption" rows="2" placeholder="Ceritakan momen ini..."
+                                required></textarea>
                         </div>
-                        
-                        <button type="submit" class="btn btn-primary w-100 py-2 rounded-3 fw-semibold"><i class="bi bi-send-fill me-2"></i>Bagikan Sekarang</button>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 rounded-3 fw-semibold"><i
+                                class="bi bi-send-fill me-2"></i>Bagikan Sekarang</button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- Filter & Pencarian -->
         <div class="row justify-content-center mb-5">
             <div class="col-md-10 col-lg-8">
                 <div class="card p-3 shadow-sm border-0 rounded-4">
@@ -318,19 +333,22 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
                         <div class="col-md-5">
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                <input type="text" class="form-control" name="search" placeholder="Cari nama / keterangan..." value="<?= htmlspecialchars($search) ?>">
+                                <input type="text" class="form-control" name="search"
+                                    placeholder="Cari nama / keterangan..." value="<?= htmlspecialchars($search) ?>">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
-                                <input type="date" class="form-control" name="date" value="<?= htmlspecialchars($filter_date) ?>">
+                                <input type="date" class="form-control" name="date"
+                                    value="<?= htmlspecialchars($filter_date) ?>">
                             </div>
                         </div>
                         <div class="col-md-3 d-flex gap-1">
                             <button class="btn btn-dark w-100 rounded-3" type="submit">Filter</button>
                             <?php if ($search !== '' || $filter_date !== ''): ?>
-                                <a href="index.php" class="btn btn-outline-secondary rounded-3" title="Reset Filter"><i class="bi bi-arrow-counterclockwise"></i></a>
+                                <a href="index.php" class="btn btn-outline-secondary rounded-3" title="Reset Filter"><i
+                                        class="bi bi-arrow-counterclockwise"></i></a>
                             <?php endif; ?>
                         </div>
                     </form>
@@ -340,93 +358,103 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
 
         <hr class="opacity-25 mb-5">
 
-        <!-- Grid Foto -->
         <h4 class="fw-bold mb-4">
-            <i class="bi bi-images text-secondary me-2"></i>Feed Terbaru 
+            <i class="bi bi-images text-secondary me-2"></i>Feed Terbaru
         </h4>
-        
+
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($photos as $photo): ?>
-            <div class="col">
-                <div class="card photo-card h-100">
-                    <img src="<?= $upload_dir . htmlspecialchars($photo['filename']) ?>" alt="Foto" loading="lazy">
-                    
-                    <div class="card-body d-flex flex-column">
-                        <p class="caption-text mb-2">"<?= htmlspecialchars($photo['caption']) ?>"</p>
-                        <p class="author-text mb-1 text-muted"><i class="bi bi-person-circle me-1"></i> <?= htmlspecialchars($photo['username']) ?></p>
-                        <p class="text-muted mt-1 mb-2" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i> <?= $photo['created_at'] ?></p>
+                <div class="col">
+                    <div class="card photo-card h-100">
+                        <img src="<?= $upload_dir . htmlspecialchars($photo['filename']) ?>" alt="Foto" loading="lazy">
 
-                        <div class="comments-section mb-3">
-                            <span class="fw-bold text-muted d-block mb-1" style="font-size: 0.75rem;">Komentar:</span>
-                            <?php
-                            $stmt_c = $db->prepare("SELECT * FROM comments WHERE photo_id = ? ORDER BY created_at ASC");
-                            $stmt_c->execute([$photo['id']]);
-                            $comments = $stmt_c->fetchAll(PDO::FETCH_ASSOC);
-                            ?>
-                            <?php if (empty($comments)): ?>
-                                <span class="text-muted fst-italic" style="font-size: 0.75rem;">Belum ada komentar.</span>
-                            <?php else: ?>
-                                <?php foreach ($comments as $c): ?>
-                                    <div class="mb-1">
-                                        <strong><?= htmlspecialchars($c['commenter']) ?>:</strong> <?= htmlspecialchars($c['comment_text']) ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <div class="card-body d-flex flex-column">
+                            <p class="caption-text mb-2">"<?= htmlspecialchars($photo['caption']) ?>"</p>
+                            <p class="author-text mb-1 text-muted"><i class="bi bi-person-circle me-1"></i>
+                                <?= htmlspecialchars($photo['username']) ?></p>
+                            <p class="text-muted mt-1 mb-2" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i>
+                                <?= $photo['created_at'] ?></p>
+
+                            <div class="comments-section mb-3">
+                                <span class="fw-bold text-muted d-block mb-1" style="font-size: 0.75rem;">Komentar:</span>
+                                <?php
+                                $stmt_c = $db->prepare("SELECT * FROM comments WHERE photo_id = ? ORDER BY created_at ASC");
+                                $stmt_c->execute([$photo['id']]);
+                                $comments = $stmt_c->fetchAll(PDO::FETCH_ASSOC);
+                                ?>
+                                <?php if (empty($comments)): ?>
+                                    <span class="text-muted fst-italic" style="font-size: 0.75rem;">Belum ada komentar.</span>
+                                <?php else: ?>
+                                    <?php foreach ($comments as $c): ?>
+                                        <div class="mb-1">
+                                            <strong><?= htmlspecialchars($c['commenter']) ?>:</strong>
+                                            <?= htmlspecialchars($c['comment_text']) ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+
+                            <form action="" method="post" class="mt-auto">
+                                <input type="hidden" name="action" value="add_comment">
+                                <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
+                                <div class="input-group input-group-sm mb-1">
+                                    <input type="text" class="form-control" name="commenter" placeholder="Nama..." required>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" name="comment_text"
+                                        placeholder="Tulis komentar..." required>
+                                    <button class="btn btn-outline-primary" type="submit"><i
+                                            class="bi bi-chat-fill"></i></button>
+                                </div>
+                            </form>
                         </div>
 
-                        <form action="" method="post" class="mt-auto">
-                            <input type="hidden" name="action" value="add_comment">
-                            <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
-                            <div class="input-group input-group-sm mb-1">
-                                <input type="text" class="form-control" name="commenter" placeholder="Nama..." required>
+                        <div class="card-footer border-top-0 pt-0 pb-3 bg-transparent">
+                            <div class="d-flex gap-2">
+                                <a href="<?= $upload_dir . htmlspecialchars($photo['filename']) ?>" download
+                                    class="btn btn-sm btn-outline-success w-50 rounded-2" title="Download Foto">
+                                    <i class="bi bi-download"></i> Unduh
+                                </a>
+
+                                <?php if (isset($_SESSION['is_admin'])): ?>
+                                    <form action="" method="post" onsubmit="return confirm('Yakin ingin menghapus foto ini?');"
+                                        class="w-50">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $photo['id'] ?>">
+                                        <button class="btn btn-sm btn-outline-danger w-100 rounded-2" type="submit"><i
+                                                class="bi bi-trash-fill"></i> Hapus</button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control" name="comment_text" placeholder="Tulis komentar..." required>
-                                <button class="btn btn-outline-primary" type="submit"><i class="bi bi-chat-fill"></i></button>
-                            </div>
-                        </form>
-                    </div>
-                    
-                    <div class="card-footer border-top-0 pt-0 pb-3 bg-transparent">
-                        <div class="d-flex gap-2">
-                            <a href="<?= $upload_dir . htmlspecialchars($photo['filename']) ?>" download class="btn btn-sm btn-outline-success w-50 rounded-2" title="Download Foto">
-                                <i class="bi bi-download"></i> Unduh
-                            </a>
 
                             <?php if (isset($_SESSION['is_admin'])): ?>
-                                <form action="" method="post" onsubmit="return confirm('Yakin ingin menghapus foto ini?');" class="w-50">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?= $photo['id'] ?>">
-                                    <button class="btn btn-sm btn-outline-danger w-100 rounded-2" type="submit"><i class="bi bi-trash-fill"></i> Hapus</button>
-                                </form>
-                            <?php endif; ?>
-                        </div>
+                                <button class="btn btn-sm btn-outline-secondary w-100 rounded-2 mt-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#editForm<?= $photo['id'] ?>">
+                                    <i class="bi bi-pencil-square me-1"></i> Edit Momen
+                                </button>
 
-                        <?php if (isset($_SESSION['is_admin'])): ?>
-                            <button class="btn btn-sm btn-outline-secondary w-100 rounded-2 mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#editForm<?= $photo['id'] ?>">
-                                <i class="bi bi-pencil-square me-1"></i> Edit Momen
-                            </button>
-                            
-                            <div class="collapse mt-2" id="editForm<?= $photo['id'] ?>">
-                                <div class="card card-body p-2 border-0 shadow-sm">
-                                    <form action="" method="post">
-                                        <input type="hidden" name="action" value="edit">
-                                        <input type="hidden" name="id" value="<?= $photo['id'] ?>">
-                                        <div class="mb-1">
-                                            <input type="text" class="form-control form-control-sm" name="username" value="<?= htmlspecialchars($photo['username']) ?>" required>
-                                        </div>
-                                        <div class="mb-1">
-                                            <textarea class="form-control form-control-sm" name="caption" rows="2" required><?= htmlspecialchars($photo['caption']) ?></textarea>
-                                        </div>
-                                        <button type="submit" class="btn btn-sm btn-primary w-100">Simpan Perubahan</button>
-                                    </form>
+                                <div class="collapse mt-2" id="editForm<?= $photo['id'] ?>">
+                                    <div class="card card-body p-2 border-0 shadow-sm">
+                                        <form action="" method="post">
+                                            <input type="hidden" name="action" value="edit">
+                                            <input type="hidden" name="id" value="<?= $photo['id'] ?>">
+                                            <div class="mb-1">
+                                                <input type="text" class="form-control form-control-sm" name="username"
+                                                    value="<?= htmlspecialchars($photo['username']) ?>" required>
+                                            </div>
+                                            <div class="mb-1">
+                                                <textarea class="form-control form-control-sm" name="caption" rows="2"
+                                                    required><?= htmlspecialchars($photo['caption']) ?></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-primary w-100">Simpan Perubahan</button>
+                                        </form>
+                                    </div>
                                 </div>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
 
+                        </div>
                     </div>
                 </div>
-            </div>
             <?php endforeach; ?>
         </div>
 
@@ -439,7 +467,6 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
 
     </div>
 
-    <!-- MODAL ADMIN LOGIN -->
     <div class="modal fade" id="adminModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content rounded-4 border-0 shadow">
@@ -451,7 +478,8 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
                     <form action="" method="post">
                         <input type="hidden" name="action" value="admin_login">
                         <div class="mb-3">
-                            <input type="password" class="form-control" name="admin_key" placeholder="Masukkan Admin Key" required autofocus>
+                            <input type="password" class="form-control" name="admin_key"
+                                placeholder="Masukkan Admin Key" required autofocus>
                         </div>
                         <button type="submit" class="btn btn-dark w-100 rounded-3">Masuk</button>
                     </form>
@@ -498,4 +526,5 @@ unset($_SESSION['message'], $_SESSION['msg_type']);
         }
     </script>
 </body>
+
 </html>
